@@ -500,6 +500,37 @@ select.campo-pedido option {
   box-sizing: border-box;
   /* … el resto de tus propiedades … */
 }
+/* Botón circular de regalo */
+.btn-gift-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  background-color: #6c757d;  /* gris por defecto */
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+/* Emoji por defecto (cuando no es regalo) */
+.btn-gift-toggle::before {
+  content: "🎁";  /* bolsa de dinero = precio normal */
+  color: white;
+}
+
+/* Cuando está activo el modo regalo (precio S/ 0) */
+.btn-gift-toggle.regalo {
+  background-color: #dc3545;  /* rojo */
+}
+.btn-gift-toggle.regalo::before {
+  content: "🎁";  /* regalo */
+}
 /* Ajustes para pantallas muy pequeñas */
 @media (max-width: 400px) {
   .grid {

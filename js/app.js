@@ -1,6 +1,6 @@
 /* ==========================================
-   CATÁLOGO DE ESCALERAS – LÓGICA COMPLETA
-   (con autocompletado desde n8n)
+   CATÁLOGO DE BICICLETAS – LÓGICA COMPLETA
+   (con edición de precios, clear sin confirmación y lógica de regalos)
    ========================================== */
 
 const state = {
@@ -53,11 +53,11 @@ function renderGrid() {
             state.cart.push({
                 cartId: ++state.cartSeq,
                 sku: prod.sku,
-                nombre: prod.nombre || 'Escalera',
+                nombre: prod.nombre || 'Bicicleta',
                 precio: Number(prod.precio) || 0,
                 originalPrecio: Number(prod.precio) || 0,
                 isGift: false,
-                type: 'escalera'
+                type: 'spinning'
             });
 
             // Solo las bicicletas de spinning reciben la balanza de regalo
@@ -68,6 +68,7 @@ function renderGrid() {
                     sku: 'BALANZA-BLUETOOTH',
                     nombre: 'Balanza Bluetooth - Regalo',
                     precio: 0,
+                    originalPrecio: 0,
                     type: 'regalo'
                 });
             }
@@ -115,58 +116,120 @@ function renderResumen() {
 
     const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
 
-    // Tabla de productos
+    // Tabla de productos (con inputs de precio y columna de acción)
     const table = document.createElement("table");
     table.style.width = "100%";
     table.style.borderCollapse = "collapse";
     table.style.marginBottom = "16px";
-   table.innerHTML = `
-  <thead>
-    <tr style="border-bottom:2px solid var(--border);">
-      <th style="padding:8px; text-align:left; color:var(--muted);">SKU</th>
-      <th style="padding:8px; text-align:left; color:var(--muted);">Producto</th>
-      <th style="padding:8px; text-align:right; color:var(--muted);">Precio</th>
-      <th style="padding:8px; text-align:center; color:var(--muted); width:40px;"></th>
-    </tr>
-  </thead>
-  <tbody id="resumenTablaBody"></tbody>
-`;
+    table.innerHTML = `
+      <thead>
+        <tr style="border-bottom:2px solid var(--border);">
+          <th style="padding:8px; text-align:left; color:var(--muted);">SKU</th>
+          <th style="padding:8px; text-align:left; color:var(--muted);">Producto</th>
+          <th style="padding:8px; text-align:right; color:var(--muted);">Precio</th>
+          <th style="padding:8px; text-align:center; color:var(--muted); width:40px;"></th>
+        </tr>
+      </thead>
+      <tbody id="resumenTablaBody"></tbody>
+    `;
     lines.appendChild(table);
 
     const tbody = table.querySelector("#resumenTablaBody");
-state.cart.forEach(item => {
-    const row = document.createElement("tr");
-    row.setAttribute("data-cartid", item.cartId); // ← necesario para identificar la fila
+    state.cart.forEach(item => {
+        const row = document.createElement("tr");
+        row.setAttribute("data-cartid", item.cartId);
 
-    // Botón de regalo solo para MINI-BANDS
-    let actionCell = '';
-    if (item.sku === 'MINI-BANDS') {
-        const bgColor = item.isGift ? '#dc3545' : '#6c757d'; // rojo si es regalo, gris si no
-        actionCell = `<td style="padding:4px; text-align:center;">
-            <button class="btn-gift-toggle" data-cartid="${item.cartId}" 
-                style="width:24px; height:24px; border-radius:50%; border:none; background-color:${bgColor}; cursor:pointer;"
-                title="${item.isGift ? 'Es un regalo (precio S/0)' : 'Precio normal'}"></button>
-        </td>`;
-    } else {
-        actionCell = `<td></td>`;
-    }
+        // Botón de regalo solo para MINI-BANDS
+        let actionCell = '';
+        if (item.sku === 'MINI-BANDS') {
+            const bgColor = item.isGift ? '#dc3545' : '#6c757d';
+            actionCell = `<td style="padding:4px; text-align:center;">
+                <button class="btn-gift-toggle" data-cartid="${item.cartId}" 
+                    style="width:24px; height:24px; border-radius:50%; border:none; background-color:${bgColor}; cursor:pointer;"
+                    title="${item.isGift ? 'Es un regalo (precio S/0)' : 'Precio normal'}"></button>
+            </td>`;
+        } else {
+            actionCell = `<td></td>`;
+        }
 
-    row.innerHTML = `
-        <td style="padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; color:var(--muted);">${item.sku}</td>
-        <td style="padding:6px 8px; border-bottom:1px solid var(--border);">${item.nombre}</td>
-        <td class="precio-cell" style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; font-weight:700;">${formatPEN(item.precio)}</td>
-        ${actionCell}
-    `;
-    tbody.appendChild(row);
-});
-
-// Asignar eventos a los botones de regalo en el resumen
-document.querySelectorAll('#resumenTablaBody .btn-gift-toggle').forEach(btn => {
-    btn.addEventListener('click', function () {
-        const cartId = parseInt(this.dataset.cartid);
-        toggleGift(cartId);
+        row.innerHTML = `
+            <td style="padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; color:var(--muted);">${item.sku}</td>
+            <td style="padding:6px 8px; border-bottom:1px solid var(--border);">${item.nombre}</td>
+            <td style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; font-weight:700;">
+                <input type="number"
+                       class="resumen-price-input"
+                       value="${item.precio}"
+                       data-original="${item.originalPrecio ?? item.precio}"
+                       data-cart-id="${item.cartId}"
+                       data-sku="${item.sku}"
+                       style="width:90px; text-align:right; font-weight:700; border:1px solid var(--border); border-radius:6px; padding:4px 8px; background:#fff;" />
+            </td>
+            ${actionCell}
+        `;
+        tbody.appendChild(row);
     });
-});
+
+    // Eventos para los inputs de precio
+    document.querySelectorAll('#resumenTablaBody .resumen-price-input').forEach(input => {
+        input.addEventListener('focus', function() {
+            this.select();
+        });
+
+        input.addEventListener('blur', function() {
+            const val = this.value.trim();
+            const cartId = parseInt(this.dataset.cartId);
+            const sku = this.dataset.sku;
+            const item = state.cart.find(i => i.cartId === cartId);
+            if (!item) return;
+
+            let nuevoPrecio;
+            if (val === '' || isNaN(Number(val))) {
+                this.value = this.dataset.original;
+                nuevoPrecio = Number(this.dataset.original);
+            } else {
+                nuevoPrecio = Number(val);
+            }
+
+            item.precio = nuevoPrecio;
+
+            // Sincronizar estado de regalo para MINI-BANDS
+            if (sku === 'MINI-BANDS') {
+                item.isGift = (nuevoPrecio === 0);
+                // Actualizar visual del botón
+                const btn = document.querySelector(`.btn-gift-toggle[data-cartid="${cartId}"]`);
+                if (btn) {
+                    btn.style.backgroundColor = item.isGift ? '#dc3545' : '#6c757d';
+                    btn.title = item.isGift ? 'Es un regalo (precio S/0)' : 'Precio normal';
+                }
+            }
+
+            // Recalcular y actualizar totales
+            const nuevoSubtotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
+            state.finalTotal = nuevoSubtotal;
+            if (el("inputPrecioFinal")) el("inputPrecioFinal").value = nuevoSubtotal;
+            if (el("resumenFinal")) el("resumenFinal").textContent = formatPEN(nuevoSubtotal);
+        });
+
+        // Actualización en tiempo real del total final (no modifica state.finalTotal hasta blur)
+        input.addEventListener('input', function() {
+            const tempVal = Number(this.value) || 0;
+            const cartId = parseInt(this.dataset.cartId);
+            const subtotalTemporal = state.cart.reduce((sum, i) => {
+                if (i.cartId === cartId) return sum + tempVal;
+                return sum + i.precio;
+            }, 0);
+            if (el("resumenFinal")) el("resumenFinal").textContent = formatPEN(subtotalTemporal);
+            if (el("inputPrecioFinal")) el("inputPrecioFinal").value = subtotalTemporal;
+        });
+    });
+
+    // Eventos para los botones de regalo (MINI-BANDS)
+    document.querySelectorAll('#resumenTablaBody .btn-gift-toggle').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const cartId = parseInt(this.dataset.cartid);
+            toggleGift(cartId);
+        });
+    });
 
     // Totales
     const totalBlock = document.createElement("div");
@@ -245,45 +308,68 @@ function renderTablaPedidoFinal() {
     tbody.innerHTML = "";
 
     state.cart.forEach(item => {
-    const row = document.createElement("tr");
-    row.setAttribute("data-cartid", item.cartId);
+        const row = document.createElement("tr");
+        row.setAttribute("data-cartid", item.cartId);
 
-    // Columna de acción (botón de regalo solo para MINI-BANDS)
-    let actionCell = '';
-if (item.sku === 'MINI-BANDS') {
-    const bgColor = item.isGift ? '#dc3545' : '#6c757d';
-    actionCell = `<td style="padding:4px; text-align:center;">
-        <button class="btn-gift-toggle" data-cartid="${item.cartId}" 
-            style="width:24px; height:24px; border-radius:50%; border:none; background-color:${bgColor}; cursor:pointer;"
-            title="${item.isGift ? 'Es un regalo (precio S/0)' : 'Precio normal'}"></button>
-    </td>`;
-} else {
-    actionCell = `<td></td>`;
+        // Botón de regalo solo para MINI-BANDS
+        let actionCell = '';
+        if (item.sku === 'MINI-BANDS') {
+            const bgColor = item.isGift ? '#dc3545' : '#6c757d';
+            actionCell = `<td style="padding:4px; text-align:center;">
+                <button class="btn-gift-toggle" data-cartid="${item.cartId}" 
+                    style="width:24px; height:24px; border-radius:50%; border:none; background-color:${bgColor}; cursor:pointer;"
+                    title="${item.isGift ? 'Es un regalo (precio S/0)' : 'Precio normal'}"></button>
+            </td>`;
+        } else {
+            actionCell = `<td></td>`;
+        }
+
+        row.innerHTML = `
+            <td style="font-size:10px; color:var(--muted);">${item.sku}</td>
+            <td>${item.nombre}</td>
+            <td style="text-align:right; font-weight:700;">${formatPEN(item.precio)}</td>
+            ${actionCell}
+        `;
+        tbody.appendChild(row);
+    });
+
+    // Asignar eventos a los botones de regalo
+    document.querySelectorAll('.btn-gift-toggle').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const cartId = parseInt(this.dataset.cartid);
+            toggleGift(cartId);
+        });
+    });
+
+    // Calcular y mostrar totales
+    const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
+    const totalFinal = state.finalTotal || subtotal;
+
+    if (el("tablaPedidoTotal")) el("tablaPedidoTotal").textContent = formatPEN(totalFinal);
+    if (el("campoMonto")) el("campoMonto").value = totalFinal;
 }
 
-    row.innerHTML = `
-        <td style="padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; color:var(--muted);">${item.sku}</td>
-        <td style="padding:6px 8px; border-bottom:1px solid var(--border);">${item.nombre}</td>
-        <td class="precio-cell" style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; font-weight:700;">${formatPEN(item.precio)}</td>
-        ${actionCell}
-    `;
-    tbody.appendChild(row);
-});
+// ---------- TOGGLE GIFT (MINI-BANDS) ----------
+function toggleGift(cartId) {
+    const item = state.cart.find(i => i.cartId === cartId);
+    if (!item || item.sku !== 'MINI-BANDS') return;
 
-// Asignar eventos a los nuevos botones
-document.querySelectorAll('.btn-gift-toggle').forEach(btn => {
-    btn.addEventListener('click', function () {
-        const cartId = parseInt(this.dataset.cartid);
-        toggleGift(cartId);
-    });
-});
+    // Alternar estado
+    item.isGift = !item.isGift;
+    item.precio = item.isGift ? 0 : (item.originalPrecio || 0);
 
-// Calcular y mostrar totales
-const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
-const totalFinal = state.finalTotal || subtotal;
+    // Resetear precio final al nuevo subtotal
+    state.finalTotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
 
-if (el("tablaPedidoTotal")) el("tablaPedidoTotal").textContent = formatPEN(totalFinal);
-if (el("campoMonto")) el("campoMonto").value = totalFinal;
+    // Detectar cuál modal está visible y volver a pintarlo
+    const summaryModal = document.getElementById('summaryModal');
+    const pedidoModal = document.getElementById('pedidoModal');
+
+    if (summaryModal && !summaryModal.classList.contains('hidden')) {
+        renderResumen();
+    } else if (pedidoModal && !pedidoModal.classList.contains('hidden')) {
+        renderTablaPedidoFinal();
+    }
 }
 
 // ---------- ENVIAR PEDIDO A n8n ----------
@@ -325,7 +411,7 @@ function enviarPedido() {
         validacion: el("campoValidacion")?.value || "",
         adelanto: el("campoAdelanto")?.value || "",
         conversation_id: new URLSearchParams(window.location.search).get('conversation_id') || "",
-        fecha: document.getElementById('campoFecha')?.value || "" // 👈 NUEVA LÍNEA
+        fecha: document.getElementById('campoFecha')?.value || ""
     };
 
     console.log("📤 Enviando a n8n:", payload);
@@ -380,9 +466,9 @@ function autocompletarCampos(datos) {
         distrito: 'campoDistrito',
         correo: 'campoCorreo',
         agente: 'campoAgente',
-        ruc: 'campoRUC',                 // ← faltaba
-        comprobante: 'campoBoleta',      // ← nuevo: Boleta/Factura automático
-        forma_de_pago: 'campoFormaPago', // ← antes decía metodo_pago
+        ruc: 'campoRUC',
+        comprobante: 'campoBoleta',
+        forma_de_pago: 'campoFormaPago',
         live: 'campoPlataforma',
         link_maps: 'campoUbicacion',
         adelanto: 'campoAdelanto',
@@ -415,33 +501,18 @@ function bindSearch() {
     });
 }
 
-function toggleGift(cartId) {
-    const item = state.cart.find(i => i.cartId === cartId);
-    if (!item || item.sku !== 'MINI-BANDS') return;
-
-    // Alternar estado
-    item.isGift = !item.isGift;
-    item.precio = item.isGift ? 0 : item.originalPrecio;
-
-    // Detectar cuál modal está visible y volver a pintarlo
-    const summaryModal = document.getElementById('summaryModal');
-    const pedidoModal = document.getElementById('pedidoModal');
-
-    if (summaryModal && !summaryModal.classList.contains('hidden')) {
-        renderResumen();
-    } else if (pedidoModal && !pedidoModal.classList.contains('hidden')) {
-        renderTablaPedidoFinal();
-    }
-}
-
 // ---------- INICIALIZACIÓN ----------
 function init() {
     renderGrid();
     bindSearch();
 
     el("btnVerPedido")?.addEventListener("click", abrirResumen);
+    // Vaciar carrito sin confirmación y cerrar modal si está abierto
     el("btnClear")?.addEventListener("click", () => {
-        if (confirm("¿Vaciar todo el carrito?")) vaciarCarrito();
+        vaciarCarrito();
+        if (el("summaryModal") && !el("summaryModal").classList.contains("hidden")) {
+            cerrarResumen();
+        }
     });
     el("summaryClose")?.addEventListener("click", cerrarResumen);
     el("pedidoClose")?.addEventListener("click", cerrarPedidoFinal);
@@ -455,7 +526,7 @@ function init() {
     actualizarContador();
     desactivarAutocompletado();
 
-    // 👇 NUEVO: fecha de hoy
+    // Fecha de hoy
     const fechaInput = document.getElementById('campoFecha');
     if (fechaInput) {
         const hoy = new Date();
@@ -465,20 +536,12 @@ function init() {
         fechaInput.value = fechaFormateada;
     }
 }
-// Asignar fecha de hoy al campo
-const fechaInput = document.getElementById('campoFecha');
-if (fechaInput) {
-    const hoy = new Date();
-    const fechaFormateada = hoy.getFullYear() + '-' +
-        String(hoy.getMonth() + 1).padStart(2, '0') + '-' +
-        String(hoy.getDate()).padStart(2, '0');
-    fechaInput.value = fechaFormateada;
-}
+
 // ---------- DESACTIVAR SUGERENCIAS DEL NAVEGADOR ----------
 function desactivarAutocompletado() {
     document.querySelectorAll('.campo-pedido, #searchInput').forEach(campo => {
         campo.setAttribute('autocomplete', 'off');
-        campo.setAttribute('autocomplete', 'new-password'); // truco anti-Chrome
+        campo.setAttribute('autocomplete', 'new-password');
     });
 }
 

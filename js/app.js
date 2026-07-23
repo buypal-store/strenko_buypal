@@ -116,7 +116,6 @@ function renderResumen() {
 
     const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
 
-    // Tabla de productos (con inputs de precio y columna de acción)
     const table = document.createElement("table");
     table.style.width = "100%";
     table.style.borderCollapse = "collapse";
@@ -128,6 +127,7 @@ function renderResumen() {
           <th style="padding:8px; text-align:left; color:var(--muted);">Producto</th>
           <th style="padding:8px; text-align:right; color:var(--muted);">Precio</th>
           <th style="padding:8px; text-align:center; color:var(--muted); width:40px;"></th>
+          <th style="padding:8px; text-align:center; color:var(--muted);"></th>
         </tr>
       </thead>
       <tbody id="resumenTablaBody"></tbody>
@@ -139,7 +139,6 @@ function renderResumen() {
         const row = document.createElement("tr");
         row.setAttribute("data-cartid", item.cartId);
 
-        // Botón de regalo solo para MINI-BANDS
         let actionCell = '';
         if (item.sku === 'MINI-BANDS') {
             const bgColor = item.isGift ? '#dc3545' : '#6c757d';
@@ -165,11 +164,18 @@ function renderResumen() {
                        style="width:90px; text-align:right; font-weight:700; border:1px solid var(--border); border-radius:6px; padding:4px 8px; background:#fff;" />
             </td>
             ${actionCell}
+            <!-- ✅ NUEVO: botón eliminar -->
+            <td style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:center;">
+              <button class="btn-eliminar-item" data-cart-id="${item.cartId}"
+                      style="cursor:pointer; font-size:15px; background:none; border:none; color:#ef4444; font-weight:700; transition:transform .15s;"
+                      onmouseenter="this.style.transform='scale(1.3)'"
+                      onmouseleave="this.style.transform='scale(1)'"
+                      title="Eliminar producto">✕</button>
+            </td>
         `;
         tbody.appendChild(row);
     });
 
-    // Eventos para los inputs de precio
     document.querySelectorAll('#resumenTablaBody .resumen-price-input').forEach(input => {
         input.addEventListener('focus', function() {
             this.select();
@@ -192,10 +198,8 @@ function renderResumen() {
 
             item.precio = nuevoPrecio;
 
-            // Sincronizar estado de regalo para MINI-BANDS
             if (sku === 'MINI-BANDS') {
                 item.isGift = (nuevoPrecio === 0);
-                // Actualizar visual del botón
                 const btn = document.querySelector(`.btn-gift-toggle[data-cartid="${cartId}"]`);
                 if (btn) {
                     btn.style.backgroundColor = item.isGift ? '#dc3545' : '#6c757d';
@@ -203,14 +207,12 @@ function renderResumen() {
                 }
             }
 
-            // Recalcular y actualizar totales
             const nuevoSubtotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
             state.finalTotal = nuevoSubtotal;
             if (el("inputPrecioFinal")) el("inputPrecioFinal").value = nuevoSubtotal;
             if (el("resumenFinal")) el("resumenFinal").textContent = formatPEN(nuevoSubtotal);
         });
 
-        // Actualización en tiempo real del total final (no modifica state.finalTotal hasta blur)
         input.addEventListener('input', function() {
             const tempVal = Number(this.value) || 0;
             const cartId = parseInt(this.dataset.cartId);
@@ -223,7 +225,6 @@ function renderResumen() {
         });
     });
 
-    // Eventos para los botones de regalo (MINI-BANDS)
     document.querySelectorAll('#resumenTablaBody .btn-gift-toggle').forEach(btn => {
         btn.addEventListener('click', function () {
             const cartId = parseInt(this.dataset.cartid);
@@ -231,7 +232,14 @@ function renderResumen() {
         });
     });
 
-    // Totales
+    // ✅ NUEVO: eventos de eliminación
+    document.querySelectorAll('.btn-eliminar-item').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const cartId = parseInt(this.dataset.cartId);
+            eliminarDelCarrito(cartId);
+        });
+    });
+
     const totalBlock = document.createElement("div");
     totalBlock.className = "summary-totals";
     totalBlock.innerHTML = `
@@ -255,7 +263,6 @@ function renderResumen() {
   `;
     lines.appendChild(totalBlock);
 
-    // Sincronizar input con total final
     const inputFinal = el("inputPrecioFinal");
     if (inputFinal) {
         inputFinal.addEventListener("input", function () {
@@ -370,6 +377,19 @@ function toggleGift(cartId) {
     } else if (pedidoModal && !pedidoModal.classList.contains('hidden')) {
         renderTablaPedidoFinal();
     }
+}
+// Eliminar producto del carrito desde el resumen
+function eliminarDelCarrito(cartId) {
+  state.cart = state.cart.filter(i => i.cartId !== cartId);
+  const nuevoSubtotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
+  state.finalTotal = nuevoSubtotal;
+  actualizarContador();
+
+  if (state.cart.length === 0) {
+    cerrarResumen();
+    return;
+  }
+  renderResumen();
 }
 
 // ---------- ENVIAR PEDIDO A n8n ----------

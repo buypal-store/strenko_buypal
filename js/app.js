@@ -1,28 +1,29 @@
 /* ==========================================
-   CATÁLOGO DE BICICLETAS – LÓGICA COMPLETA
-   (con edición de precios, clear sin confirmación y lógica de regalos)
+   CATÁLOGO DE bicicletas – LÓGICA COMPLETA
+   (con autocompletado desde n8n)
    ========================================== */
 
 const state = {
-    cart: [],
-    cartSeq: 0,
-    finalTotal: 0
+  cart: [],
+  cartSeq: 0,
+  finalTotal: 0
 };
 
 const el = (id) => document.getElementById(id);
-
-function formatPEN(n) {
-    return `S/ ${Math.round(Number(n) || 0)}`;
-}
-function normalizar(str) {
-  return String(str || '')
+// Quita tildes, pasa a minúsculas y convierte separadores en espacios
+function normalizar(txt) {
+  return String(txt || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')   // quita tildes
-    .replace(/[^a-z0-9]+/g, ' ')        // cambia guiones, puntos, etc. por espacios
+    .replace(/[\u0300-\u036f]/g, '')   // elimina diacríticos (á→a, ñ→n)
+    .replace(/[^a-z0-9]+/g, ' ')        // guiones, puntos, slashes → espacio
     .trim();
 }
+function formatPEN(n) {
+  return `S/ ${Math.round(Number(n) || 0)}`;
+}
 
+// ---------- RENDERIZAR PRODUCTOS ----------
 function renderGrid() {
   const grid = el("productGrid");
   if (!grid) return;
@@ -92,167 +93,182 @@ function renderGrid() {
 
 // ---------- CONTADOR DEL CARRITO ----------
 function actualizarContador() {
-    const contador = el("contadorCarrito");
-    if (!contador) return;
-    const total = state.cart.length;
-    contador.textContent = total;
-    contador.style.display = total === 0 ? 'none' : 'inline-flex';
+  const contador = el("contadorCarrito");
+  if (!contador) return;
+  const total = state.cart.length;
+  contador.textContent = total;
+  contador.style.display = total === 0 ? 'none' : 'inline-flex';
 }
 
 function vaciarCarrito() {
-    state.cart = [];
-    state.finalTotal = 0;
-    actualizarContador();
+  state.cart = [];
+  state.finalTotal = 0;
+  actualizarContador();
 }
 
 // ---------- MODAL RESUMEN ----------
 function abrirResumen() {
-    if (state.cart.length === 0) {
-        alert('🛒 No hay productos en el pedido');
-        return;
-    }
-    renderResumen();
-    el("summaryModal").classList.remove("hidden");
+  if (state.cart.length === 0) {
+    alert('🛒 No hay productos en el pedido');
+    return;
+  }
+  renderResumen();
+  el("summaryModal").classList.remove("hidden");
 }
 
 function cerrarResumen() {
-    el("summaryModal").classList.add("hidden");
+  el("summaryModal").classList.add("hidden");
+}
+
+// 🔁 NUEVA: Alternar regalo
+function toggleRegalo(cartId) {
+  const item = state.cart.find(i => i.cartId === cartId);
+  if (!item) return;
+
+  if (item.regaloOriginalPrice !== undefined) {
+    // Restaurar precio original
+    item.precio = item.regaloOriginalPrice;
+    delete item.regaloOriginalPrice;
+  } else {
+    // Convertir en regalo (guardar precio actual si es >0)
+    if (item.precio > 0) {
+      item.regaloOriginalPrice = item.precio;
+      item.precio = 0;
+    }
+  }
+
+  const nuevoSubtotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
+  state.finalTotal = nuevoSubtotal;
+  renderResumen();
+}
+// Eliminar producto del carrito desde el resumen
+function eliminarDelCarrito(cartId) {
+  state.cart = state.cart.filter(i => i.cartId !== cartId);
+  const nuevoSubtotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
+  state.finalTotal = nuevoSubtotal;
+  actualizarContador();
+
+  if (state.cart.length === 0) {
+    cerrarResumen();
+    return;
+  }
+  renderResumen();
 }
 
 function renderResumen() {
-    const lines = el("summaryLines");
-    if (!lines) return;
-    lines.innerHTML = "";
+  const lines = el("summaryLines");
+  if (!lines) return;
+  lines.innerHTML = "";
 
-    const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
+  const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
 
-    const table = document.createElement("table");
-    table.style.width = "100%";
-    table.style.borderCollapse = "collapse";
-    table.style.marginBottom = "16px";
-    table.innerHTML = `
-      <thead>
-        <tr style="border-bottom:2px solid var(--border);">
-          <th style="padding:8px; text-align:left; color:var(--muted);">SKU</th>
-          <th style="padding:8px; text-align:left; color:var(--muted);">Producto</th>
-          <th style="padding:8px; text-align:right; color:var(--muted);">Precio</th>
-          <th style="padding:8px; text-align:center; color:var(--muted); width:40px;"></th>
-          <th style="padding:8px; text-align:center; color:var(--muted);"></th>
-        </tr>
-      </thead>
-      <tbody id="resumenTablaBody"></tbody>
+  const table = document.createElement("table");
+  table.style.width = "100%";
+  table.style.borderCollapse = "collapse";
+  table.style.marginBottom = "16px";
+  table.innerHTML = `
+    <thead>
+      <tr style="border-bottom:2px solid var(--border);">
+        <th style="padding:8px; text-align:left; color:var(--muted);">SKU</th>
+        <th style="padding:8px; text-align:left; color:var(--muted);">Producto</th>
+        <th style="padding:8px; text-align:right; color:var(--muted);">Precio</th>
+        <th style="padding:8px; text-align:center; color:var(--muted);">🎁</th>
+        <th style="padding:8px; text-align:center; color:var(--muted);"></th>
+      </tr>
+    </thead>
+    <tbody id="resumenTablaBody"></tbody>
+  `;
+  lines.appendChild(table);
+
+  const tbody = table.querySelector("#resumenTablaBody");
+  state.cart.forEach(item => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td style="padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; color:var(--muted);">${item.sku}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid var(--border);">${item.nombre}</td>
+      <td style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; font-weight:700;">
+        <input type="number"
+               class="resumen-price-input"
+               value="${item.precio}"
+               data-original="${item.originalPrice ?? item.precio}"
+               data-cart-id="${item.cartId}"
+               style="width:90px; text-align:right; font-weight:700; border:1px solid var(--border); border-radius:6px; padding:4px 8px; background:#fff;" />
+      </td>
+      <td style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:center;">
+        <button class="btn-regalo-toggle" data-cart-id="${item.cartId}"
+                style="cursor:pointer; font-size:16px; background:none; border:none;"
+                title="Alternar regalo">${item.precio === 0 ? '🎁' : '🎁'}</button>
+      </td>
+      <td style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:center;">
+        <button class="btn-eliminar-item" data-cart-id="${item.cartId}"
+                style="cursor:pointer; font-size:15px; background:none; border:none; color:#ef4444; font-weight:700; transition:transform .15s;"
+                onmouseenter="this.style.transform='scale(1.3)'"
+                onmouseleave="this.style.transform='scale(1)'"
+                title="Eliminar producto">✕</button>
+      </td>
     `;
-    lines.appendChild(table);
+    tbody.appendChild(row);
+  });
 
-    const tbody = table.querySelector("#resumenTablaBody");
-    state.cart.forEach(item => {
-        const row = document.createElement("tr");
-        row.setAttribute("data-cartid", item.cartId);
+  document.querySelectorAll('.resumen-price-input').forEach(input => {
+    input.addEventListener('focus', function() {
+      this.select();
+    });
+    input.addEventListener('blur', function() {
+      const val = this.value.trim();
+      const cartId = parseInt(this.dataset.cartId);
+      const item = state.cart.find(i => i.cartId === cartId);
+      if (!item) return;
 
-        let actionCell = '';
-        if (item.sku === 'MINI-BANDS') {
-            const bgColor = item.isGift ? '#dc3545' : '#6c757d';
-            actionCell = `<td style="padding:4px; text-align:center;">
-                <button class="btn-gift-toggle" data-cartid="${item.cartId}" 
-                    style="width:24px; height:24px; border-radius:50%; border:none; background-color:${bgColor}; cursor:pointer;"
-                    title="${item.isGift ? 'Es un regalo (precio S/0)' : 'Precio normal'}"></button>
-            </td>`;
-        } else {
-            actionCell = `<td></td>`;
+      if (val === '' || isNaN(Number(val))) {
+        this.value = this.dataset.original;
+        item.precio = Number(this.dataset.original);
+      } else {
+        const nuevoPrecio = Number(val);
+        item.precio = nuevoPrecio;
+        if (nuevoPrecio > 0 && item.regaloOriginalPrice !== undefined) {
+          delete item.regaloOriginalPrice;
+          const btn = document.querySelector(`.btn-regalo-toggle[data-cart-id="${cartId}"]`);
+          if (btn) btn.textContent = '🎁';
         }
+      }
 
-        row.innerHTML = `
-            <td style="padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; color:var(--muted);">${item.sku}</td>
-            <td style="padding:6px 8px; border-bottom:1px solid var(--border);">${item.nombre}</td>
-            <td style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; font-weight:700;">
-                <input type="number"
-                       class="resumen-price-input"
-                       value="${item.precio}"
-                       data-original="${item.originalPrecio ?? item.precio}"
-                       data-cart-id="${item.cartId}"
-                       data-sku="${item.sku}"
-                       style="width:90px; text-align:right; font-weight:700; border:1px solid var(--border); border-radius:6px; padding:4px 8px; background:#fff;" />
-            </td>
-            ${actionCell}
-            <!-- ✅ NUEVO: botón eliminar -->
-            <td style="padding:6px 8px; border-bottom:1px solid var(--border); text-align:center;">
-              <button class="btn-eliminar-item" data-cart-id="${item.cartId}"
-                      style="cursor:pointer; font-size:15px; background:none; border:none; color:#ef4444; font-weight:700; transition:transform .15s;"
-                      onmouseenter="this.style.transform='scale(1.3)'"
-                      onmouseleave="this.style.transform='scale(1)'"
-                      title="Eliminar producto">✕</button>
-            </td>
-        `;
-        tbody.appendChild(row);
+      const nuevoSubtotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
+      state.finalTotal = nuevoSubtotal;
+      if (el("inputPrecioFinal")) el("inputPrecioFinal").value = nuevoSubtotal;
+      if (el("resumenFinal")) el("resumenFinal").textContent = formatPEN(nuevoSubtotal);
     });
 
-    document.querySelectorAll('#resumenTablaBody .resumen-price-input').forEach(input => {
-        input.addEventListener('focus', function() {
-            this.select();
-        });
-
-        input.addEventListener('blur', function() {
-            const val = this.value.trim();
-            const cartId = parseInt(this.dataset.cartId);
-            const sku = this.dataset.sku;
-            const item = state.cart.find(i => i.cartId === cartId);
-            if (!item) return;
-
-            let nuevoPrecio;
-            if (val === '' || isNaN(Number(val))) {
-                this.value = this.dataset.original;
-                nuevoPrecio = Number(this.dataset.original);
-            } else {
-                nuevoPrecio = Number(val);
-            }
-
-            item.precio = nuevoPrecio;
-
-            if (sku === 'MINI-BANDS') {
-                item.isGift = (nuevoPrecio === 0);
-                const btn = document.querySelector(`.btn-gift-toggle[data-cartid="${cartId}"]`);
-                if (btn) {
-                    btn.style.backgroundColor = item.isGift ? '#dc3545' : '#6c757d';
-                    btn.title = item.isGift ? 'Es un regalo (precio S/0)' : 'Precio normal';
-                }
-            }
-
-            const nuevoSubtotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
-            state.finalTotal = nuevoSubtotal;
-            if (el("inputPrecioFinal")) el("inputPrecioFinal").value = nuevoSubtotal;
-            if (el("resumenFinal")) el("resumenFinal").textContent = formatPEN(nuevoSubtotal);
-        });
-
-        input.addEventListener('input', function() {
-            const tempVal = Number(this.value) || 0;
-            const cartId = parseInt(this.dataset.cartId);
-            const subtotalTemporal = state.cart.reduce((sum, i) => {
-                if (i.cartId === cartId) return sum + tempVal;
-                return sum + i.precio;
-            }, 0);
-            if (el("resumenFinal")) el("resumenFinal").textContent = formatPEN(subtotalTemporal);
-            if (el("inputPrecioFinal")) el("inputPrecioFinal").value = subtotalTemporal;
-        });
+    input.addEventListener('input', function() {
+      const tempVal = Number(this.value) || 0;
+      const cartId = parseInt(this.dataset.cartId);
+      const subtotalTemporal = state.cart.reduce((sum, i) => {
+        if (i.cartId === cartId) return sum + tempVal;
+        return sum + i.precio;
+      }, 0);
+      if (el("resumenFinal")) el("resumenFinal").textContent = formatPEN(subtotalTemporal);
+      if (el("inputPrecioFinal")) el("inputPrecioFinal").value = subtotalTemporal;
     });
+  });
 
-    document.querySelectorAll('#resumenTablaBody .btn-gift-toggle').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const cartId = parseInt(this.dataset.cartid);
-            toggleGift(cartId);
-        });
+  document.querySelectorAll('.btn-regalo-toggle').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      const cartId = parseInt(this.dataset.cartId);
+      toggleRegalo(cartId);
     });
+  });
 
-    // ✅ NUEVO: eventos de eliminación
-    document.querySelectorAll('.btn-eliminar-item').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const cartId = parseInt(this.dataset.cartId);
-            eliminarDelCarrito(cartId);
-        });
+  // ✅ NUEVO: eventos de eliminación
+  document.querySelectorAll('.btn-eliminar-item').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const cartId = parseInt(this.dataset.cartId);
+      eliminarDelCarrito(cartId);
     });
+  });
 
-    const totalBlock = document.createElement("div");
-    totalBlock.className = "summary-totals";
-    totalBlock.innerHTML = `
+  const totalBlock = document.createElement("div");
+  totalBlock.className = "summary-totals";
+  totalBlock.innerHTML = `
     <div class="row discount" style="justify-content: space-between; margin-bottom: 12px;">
       <span style="font-weight:600;">Subtotal</span>
       <span style="font-weight:700;">${formatPEN(subtotal)}</span>
@@ -271,252 +287,191 @@ function renderResumen() {
       </span>
     </div>
   `;
-    lines.appendChild(totalBlock);
+  lines.appendChild(totalBlock);
 
-    const inputFinal = el("inputPrecioFinal");
-    if (inputFinal) {
-        inputFinal.addEventListener("input", function () {
-            const val = Math.round(Number(this.value) || 0);
-            state.finalTotal = val;
-            if (el("resumenFinal")) {
-                el("resumenFinal").textContent = formatPEN(val);
-            }
-        });
-    }
+  const inputFinal = el("inputPrecioFinal");
+  if (inputFinal) {
+    inputFinal.addEventListener("input", function () {
+      const val = Math.round(Number(this.value) || 0);
+      state.finalTotal = val;
+      if (el("resumenFinal")) {
+        el("resumenFinal").textContent = formatPEN(val);
+      }
+    });
+  }
 
-    const btnContinuar = el("btnIrPedidoFinal");
-    if (btnContinuar) {
-        btnContinuar.onclick = () => {
-            cerrarResumen();
-            abrirPedidoFinal();
-        };
-    }
+  const btnContinuar = el("btnIrPedidoFinal");
+  if (btnContinuar) {
+    btnContinuar.onclick = () => {
+      cerrarResumen();
+      abrirPedidoFinal();
+    };
+  }
 }
-
-// ---------- MODAL PEDIDO FINAL ----------
+// ---------- MODAL PEDIDO FINAL (sin cambios) ----------
 function abrirPedidoFinal() {
-    if (state.cart.length === 0) {
-        alert('🛒 No hay productos en el pedido');
-        return;
-    }
-    const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
-    const totalFinal = state.finalTotal || subtotal;
-    if (el("campoMonto")) el("campoMonto").value = totalFinal;
-    renderTablaPedidoFinal();
-    el("pedidoModal").classList.remove("hidden");
+  if (state.cart.length === 0) {
+    alert('🛒 No hay productos en el pedido');
+    return;
+  }
+  const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
+  const totalFinal = state.finalTotal || subtotal;
+  if (el("campoMonto")) el("campoMonto").value = totalFinal;
+  renderTablaPedidoFinal();
+  el("pedidoModal").classList.remove("hidden");
 
-    // Valores por defecto
-    if (el("campoMedio") && !el("campoMedio").value) el("campoMedio").value = "BP";
-    if (el("campoTipo") && !el("campoTipo").value) el("campoTipo").value = "Menor";
-    if (el("campoTurno") && !el("campoTurno").value) el("campoTurno").value = "T";
-    if (el("campoEstado") && !el("campoEstado").value) el("campoEstado").value = "Entregado";
+  if (el("campoMedio") && !el("campoMedio").value) el("campoMedio").value = "BP";
+  if (el("campoTipo") && !el("campoTipo").value) el("campoTipo").value = "Menor";
+  if (el("campoTurno") && !el("campoTurno").value) el("campoTurno").value = "T";
+  if (el("campoEstado") && !el("campoEstado").value) el("campoEstado").value = "Entregado";
 
-    // ✅ Cargar datos desde n8n (IA)
-    cargarDatosDesdeN8n();
+  cargarDatosDesdeN8n();
 }
 
 function cerrarPedidoFinal() {
-    el("pedidoModal").classList.add("hidden");
+  el("pedidoModal").classList.add("hidden");
 }
 
 function renderTablaPedidoFinal() {
-    const tbody = el("tablaPedidoBody");
-    if (!tbody) return;
-    tbody.innerHTML = "";
+  const tbody = el("tablaPedidoBody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  let total = 0;
 
-    state.cart.forEach(item => {
-        const row = document.createElement("tr");
-        row.setAttribute("data-cartid", item.cartId);
+  state.cart.forEach(item => {
+    total += item.precio;
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td style="font-size:10px; color:var(--muted);">${item.sku}</td>
+      <td>${item.nombre}</td>
+      <td style="text-align:right; font-weight:700;">${formatPEN(item.precio)}</td>
+    `;
+    tbody.appendChild(row);
+  });
 
-        // Botón de regalo solo para MINI-BANDS
-        let actionCell = '';
-        if (item.sku === 'MINI-BANDS') {
-            const bgColor = item.isGift ? '#dc3545' : '#6c757d';
-            actionCell = `<td style="padding:4px; text-align:center;">
-                <button class="btn-gift-toggle" data-cartid="${item.cartId}" 
-                    style="width:24px; height:24px; border-radius:50%; border:none; background-color:${bgColor}; cursor:pointer;"
-                    title="${item.isGift ? 'Es un regalo (precio S/0)' : 'Precio normal'}"></button>
-            </td>`;
-        } else {
-            actionCell = `<td></td>`;
-        }
+  const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
+  const totalFinal = state.finalTotal || subtotal;
 
-        row.innerHTML = `
-            <td style="font-size:10px; color:var(--muted);">${item.sku}</td>
-            <td>${item.nombre}</td>
-            <td style="text-align:right; font-weight:700;">${formatPEN(item.precio)}</td>
-            ${actionCell}
-        `;
-        tbody.appendChild(row);
-    });
-
-    // Asignar eventos a los botones de regalo
-    document.querySelectorAll('.btn-gift-toggle').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const cartId = parseInt(this.dataset.cartid);
-            toggleGift(cartId);
-        });
-    });
-
-    // Calcular y mostrar totales
-    const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
-    const totalFinal = state.finalTotal || subtotal;
-
-    if (el("tablaPedidoTotal")) el("tablaPedidoTotal").textContent = formatPEN(totalFinal);
-    if (el("campoMonto")) el("campoMonto").value = totalFinal;
+  if (el("tablaPedidoTotal")) el("tablaPedidoTotal").textContent = formatPEN(totalFinal);
+  if (el("campoMonto")) el("campoMonto").value = totalFinal;
 }
 
-// ---------- TOGGLE GIFT (MINI-BANDS) ----------
-function toggleGift(cartId) {
-    const item = state.cart.find(i => i.cartId === cartId);
-    if (!item || item.sku !== 'MINI-BANDS') return;
-
-    // Alternar estado
-    item.isGift = !item.isGift;
-    item.precio = item.isGift ? 0 : (item.originalPrecio || 0);
-
-    // Resetear precio final al nuevo subtotal
-    state.finalTotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
-
-    // Detectar cuál modal está visible y volver a pintarlo
-    const summaryModal = document.getElementById('summaryModal');
-    const pedidoModal = document.getElementById('pedidoModal');
-
-    if (summaryModal && !summaryModal.classList.contains('hidden')) {
-        renderResumen();
-    } else if (pedidoModal && !pedidoModal.classList.contains('hidden')) {
-        renderTablaPedidoFinal();
-    }
-}
-// Eliminar producto del carrito desde el resumen
-function eliminarDelCarrito(cartId) {
-  state.cart = state.cart.filter(i => i.cartId !== cartId);
-  const nuevoSubtotal = state.cart.reduce((sum, i) => sum + i.precio, 0);
-  state.finalTotal = nuevoSubtotal;
-  actualizarContador();
-
-  if (state.cart.length === 0) {
-    cerrarResumen();
-    return;
-  }
-  renderResumen();
-}
-
-// ---------- ENVIAR PEDIDO A n8n ----------
+// ---------- ENVIAR PEDIDO A n8n (sin cambios) ----------
 function enviarPedido() {
-    const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
-    const totalFinal = state.finalTotal || subtotal;
+  const subtotal = state.cart.reduce((sum, item) => sum + item.precio, 0);
+  const totalFinal = state.finalTotal || subtotal;
 
-    const payload = {
-        productos: state.cart.map(item => ({
-            sku: item.sku,
-            nombre: item.nombre,
-            precio: item.precio
-        })),
-        total: totalFinal,
-        agente: el("campoAgente")?.value || "",
-        reparto: el("campoReparto")?.value || "",
-        turno: el("campoTurno")?.value || "T",
-        formaPago: el("campoFormaPago")?.value || "",
-        pago: el("campoPago")?.value || "",
-        boleta: el("campoBoleta")?.value || "",
-        observacion: el("campoObservacion")?.value || "",
-        comision: el("campoComision")?.value || "",
-        ruc: el("campoRUC")?.value || "",
-        medio: el("campoMedio")?.value || "BP",
-        plataforma: el("campoPlataforma")?.value || "",
-        tipo: el("campoTipo")?.value || "Menor",
-        dni: el("campoDNI")?.value || "",
-        cliente: el("campoCliente")?.value || "",
-        celular: el("campoCelular")?.value || "",
-        ubicacion: el("campoUbicacion")?.value || "",
-        envioCliente: el("campoEnvioCliente")?.value || "",
-        direccion: el("campoDireccion")?.value || "",
-        distrito: el("campoDistrito")?.value || "",
-        zona: el("campoZona")?.value || "",
-        cobro: el("campoCobro")?.value || "",
-        referencia: el("campoReferencia")?.value || "",
-        obs3: el("campoCorreo")?.value || "",
-        estado: el("campoEstado")?.value || "Entregado",
-        validacion: el("campoValidacion")?.value || "",
-        adelanto: el("campoAdelanto")?.value || "",
-        conversation_id: new URLSearchParams(window.location.search).get('conversation_id') || "",
-        fecha: document.getElementById('campoFecha')?.value || ""
-    };
+  const payload = {
+    productos: state.cart.map(item => ({
+      sku: item.sku,
+      nombre: item.nombre,
+      precio: item.precio
+    })),
+    total: totalFinal,
+    agente: el("campoAgente")?.value || "",
+    reparto: el("campoReparto")?.value || "",
+    turno: el("campoTurno")?.value || "T",
+    formaPago: el("campoFormaPago")?.value || "",
+    pago: el("campoPago")?.value || "",
+    boleta: el("campoBoleta")?.value || "",
+    observacion: el("campoObservacion")?.value || "",
+    comision: el("campoComision")?.value || "",
+    ruc: el("campoRUC")?.value || "",
+    medio: el("campoMedio")?.value || "BP",
+    plataforma: el("campoPlataforma")?.value || "",
+    tipo: el("campoTipo")?.value || "Menor",
+    dni: el("campoDNI")?.value || "",
+    cliente: el("campoCliente")?.value || "",
+    celular: el("campoCelular")?.value || "",
+    ubicacion: el("campoUbicacion")?.value || "",
+    envioCliente: el("campoEnvioCliente")?.value || "",
+    direccion: el("campoDireccion")?.value || "",
+    distrito: el("campoDistrito")?.value || "",
+    zona: el("campoZona")?.value || "",
+    cobro: el("campoCobro")?.value || "",
+    referencia: el("campoReferencia")?.value || "",
+    obs3: el("campoCorreo")?.value || "",
+    estado: el("campoEstado")?.value || "Entregado",
+    validacion: el("campoValidacion")?.value || "",
+    adelanto: el("campoAdelanto")?.value || "",
+    conversation_id: new URLSearchParams(window.location.search).get('conversation_id') || "",
+    fecha: document.getElementById('campoFecha')?.value || ""
+  };
 
-    console.log("📤 Enviando a n8n:", payload);
+  console.log("📤 Enviando a n8n:", payload);
 
-    fetch('https://n8n.buypal.com.pe/webhook/Subir_pedido_drive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-        .then(res => {
-            if (res.ok) {
-                alert('✅ Pedido subido correctamente');
-                cerrarPedidoFinal();
-                vaciarCarrito();
-            } else {
-                alert('❌ Error al enviar el pedido');
-            }
-        })
-        .catch(err => {
-            alert('❌ Error de conexión: ' + err.message);
-        });
+  fetch('https://n8n.buypal.com.pe/webhook/Subir_pedido_drive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(res => {
+    if (res.ok) {
+      alert('✅ Pedido subido correctamente');
+      cerrarPedidoFinal();
+      vaciarCarrito();
+    } else {
+      alert('❌ Error al enviar el pedido');
+    }
+  })
+  .catch(err => {
+    alert('❌ Error de conexión: ' + err.message);
+  });
 }
 
 // ---------- CARGAR DATOS DESDE n8n (IA) ----------
 async function cargarDatosDesdeN8n() {
-    const conversationId = new URLSearchParams(window.location.search).get('conversation_id');
-    if (!conversationId) return;
+  const conversationId = new URLSearchParams(window.location.search).get('conversation_id');
+  if (!conversationId) return;
 
-    try {
-        const response = await fetch('https://n8n.buypal.com.pe/webhook/Tomar_pedido_IA', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: Number(conversationId) })
-        });
-        const datos = await response.json();
+  try {
+    const response = await fetch('https://n8n.buypal.com.pe/webhook/Tomar_pedido_IA', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: Number(conversationId) })
+    });
+    const datos = await response.json();
 
-        if (datos && Object.keys(datos).length > 0) {
-            autocompletarCampos(datos);
-        }
-    } catch (err) {
-        console.log('⏳ Reintentando obtener datos de la IA...');
-        setTimeout(cargarDatosDesdeN8n, 3000);
+    if (datos && Object.keys(datos).length > 0) {
+      autocompletarCampos(datos);
     }
+  } catch (err) {
+    console.log('⏳ Reintentando obtener datos de la IA...');
+    setTimeout(cargarDatosDesdeN8n, 3000);
+  }
 }
 
 function autocompletarCampos(datos) {
-    const mapeo = {
-        nombre: 'campoCliente',
-        dni: 'campoDNI',
-        numero: 'campoCelular',
-        direccion: 'campoDireccion',
-        distrito: 'campoDistrito',
-        correo: 'campoCorreo',
-        agente: 'campoAgente',
-        ruc: 'campoRUC',
-        comprobante: 'campoBoleta',
-        forma_de_pago: 'campoFormaPago',
-        live: 'campoPlataforma',
-        link_maps: 'campoUbicacion',
-        adelanto: 'campoAdelanto',
-    };
+  const mapeo = {
+    nombre: 'campoCliente',
+    dni: 'campoDNI',
+    numero: 'campoCelular',
+    direccion: 'campoDireccion',
+    distrito: 'campoDistrito',
+    correo: 'campoCorreo',
+    agente: 'campoAgente',
+    ruc: 'campoRUC',
+    comprobante: 'campoBoleta',
+    forma_de_pago: 'campoFormaPago',
+    live: 'campoPlataforma',
+    link_maps: 'campoUbicacion',
+    adelanto: 'campoAdelanto',
+  };
 
-    Object.entries(datos).forEach(([clave, valor]) => {
-        const campoId = mapeo[clave];
-        if (campoId) {
-            const campo = el(campoId);
-            if (campo && !campo.value && valor) {
-                campo.value = valor;
-                campo.style.borderColor = 'rgba(34,197,94,.4)';
-            }
-        }
-    });
+  Object.entries(datos).forEach(([clave, valor]) => {
+    const campoId = mapeo[clave];
+    if (campoId) {
+      const campo = el(campoId);
+      if (campo && !campo.value && valor) {
+        campo.value = valor;
+        campo.style.borderColor = 'rgba(34,197,94,.4)';
+      }
+    }
+  });
 }
 
 // ---------- BÚSQUEDA (por SKU) ----------
+
 function bindSearch() {
   const searchInput = el("searchInput");
   if (!searchInput) return;
@@ -524,15 +479,35 @@ function bindSearch() {
   searchInput.addEventListener("input", function (e) {
     const tokens = normalizar(e.target.value).split(' ').filter(Boolean);
     const cards = document.querySelectorAll('.card');
+    let visibles = 0;
 
     cards.forEach(card => {
       const hay = card.dataset.search || '';
       const compact = card.dataset.searchCompact || '';
+
+      // Todos los tokens deben aparecer (AND), en cualquier orden
       const match = tokens.length === 0 || tokens.every(t =>
         hay.includes(t) || compact.includes(t)
       );
+
       card.style.display = match ? '' : 'none';
+      if (match) visibles++;
     });
+
+    // Aviso cuando no hay resultados
+    let aviso = el("searchEmpty");
+    if (visibles === 0 && tokens.length > 0) {
+      if (!aviso) {
+        aviso = document.createElement("div");
+        aviso.id = "searchEmpty";
+        aviso.style.cssText = "padding:24px; text-align:center; color:var(--muted); grid-column:1/-1;";
+        el("productGrid")?.appendChild(aviso);
+      }
+      aviso.textContent = `Sin resultados para "${e.target.value.trim()}"`;
+      aviso.style.display = '';
+    } else if (aviso) {
+      aviso.style.display = 'none';
+    }
   });
 }
 // ---------- AGREGAR PRODUCTO PERSONALIZADO ----------
@@ -623,51 +598,49 @@ function guardarNuevoProducto() {
   renderGrid();
   cerrarNuevoProducto();
 }
-
 // ---------- INICIALIZACIÓN ----------
-function init() { 
-    cargarProductosCustom();  // ✅ NUEVO
-    renderGrid();
-    bindSearch();
-
-    el("btnNuevoProducto")?.addEventListener("click", abrirNuevoProducto);  // ✅ NUEVO
-    el("btnVerPedido")?.addEventListener("click", abrirResumen);
-    // Vaciar carrito sin confirmación y cerrar modal si está abierto
-    el("btnClear")?.addEventListener("click", () => {
-        vaciarCarrito();
-        if (el("summaryModal") && !el("summaryModal").classList.contains("hidden")) {
-            cerrarResumen();
-        }
-    });
-    el("summaryClose")?.addEventListener("click", cerrarResumen);
-    el("pedidoClose")?.addEventListener("click", cerrarPedidoFinal);
-    el("btnEnviarPedido")?.addEventListener("click", enviarPedido);
-
-    const summaryModal = el("summaryModal");
-    if (summaryModal) summaryModal.addEventListener("click", (e) => { if (e.target.id === "summaryModal") cerrarResumen(); });
-    const pedidoModal = el("pedidoModal");
-    if (pedidoModal) pedidoModal.addEventListener("click", (e) => { if (e.target.id === "pedidoModal") cerrarPedidoFinal(); });
-
-    actualizarContador();
-    desactivarAutocompletado();
-
-    // Fecha de hoy
-    const fechaInput = document.getElementById('campoFecha');
-    if (fechaInput) {
-        const hoy = new Date();
-        const fechaFormateada = hoy.getFullYear() + '-' +
-            String(hoy.getMonth() + 1).padStart(2, '0') + '-' +
-            String(hoy.getDate()).padStart(2, '0');
-        fechaInput.value = fechaFormateada;
+function init() {
+  cargarProductosCustom();  // ✅ NUEVO
+  renderGrid();
+  bindSearch();
+  
+  el("btnNuevoProducto")?.addEventListener("click", abrirNuevoProducto);  // ✅ NUEVO
+  el("btnVerPedido")?.addEventListener("click", abrirResumen);
+  // 🔁 Vaciar sin confirmación, y cierra el modal de resumen si está abierto
+  el("btnClear")?.addEventListener("click", () => {
+    vaciarCarrito();
+    if (el("summaryModal") && !el("summaryModal").classList.contains("hidden")) {
+      cerrarResumen();
     }
+  });
+  el("summaryClose")?.addEventListener("click", cerrarResumen);
+  el("pedidoClose")?.addEventListener("click", cerrarPedidoFinal);
+  el("btnEnviarPedido")?.addEventListener("click", enviarPedido);
+
+  const summaryModal = el("summaryModal");
+  if (summaryModal) summaryModal.addEventListener("click", (e) => { if (e.target.id === "summaryModal") cerrarResumen(); });
+  const pedidoModal = el("pedidoModal");
+  if (pedidoModal) pedidoModal.addEventListener("click", (e) => { if (e.target.id === "pedidoModal") cerrarPedidoFinal(); });
+
+  actualizarContador();
+  desactivarAutocompletado();
+
+  const fechaInput = document.getElementById('campoFecha');
+  if (fechaInput) {
+    const hoy = new Date();
+    const fechaFormateada = hoy.getFullYear() + '-' +
+      String(hoy.getMonth() + 1).padStart(2, '0') + '-' +
+      String(hoy.getDate()).padStart(2, '0');
+    fechaInput.value = fechaFormateada;
+  }
 }
 
 // ---------- DESACTIVAR SUGERENCIAS DEL NAVEGADOR ----------
 function desactivarAutocompletado() {
-    document.querySelectorAll('.campo-pedido, #searchInput').forEach(campo => {
-        campo.setAttribute('autocomplete', 'off');
-        campo.setAttribute('autocomplete', 'new-password');
-    });
+  document.querySelectorAll('.campo-pedido, #searchInput').forEach(campo => {
+    campo.setAttribute('autocomplete', 'off');
+    campo.setAttribute('autocomplete', 'new-password');
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);

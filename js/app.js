@@ -15,7 +15,7 @@ function formatPEN(n) {
     return `S/ ${Math.round(Number(n) || 0)}`;
 }
 
-// ---------- RENDERIZAR PRODUCTOS ----------
+
 function renderGrid() {
   const grid = el("productGrid");
   if (!grid) return;

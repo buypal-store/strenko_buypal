@@ -1,3 +1,15 @@
+// Imágenes personalizadas por SKU (sobrescriben la automática "imagenes/SKU.jpeg")
+const IMAGENES_MANUALES = {
+  "SPINNING-BIKE":                     "imagenes/Spinning 4 kg.jpeg",
+  "SPINNING-BIKE-DH68":                "imagenes/Spinning bike DH68 8 kg.jpeg",
+  "MINI-BANDS":                        "imagenes/bandas elasticas.jpg",
+  "ESCALADORA-VERTICAL":               "imagenes/escaladora.jpg",
+  "BALANZA-BLUETOOTH":                  "imagenes/balanza-blutu.jpg",
+  "MAQUINA-ABDOMINALES-22366":               "imagenes/Abdominales.jpeg",
+  
+};
+
+
 // === Catálogo Strenko — se alimenta solo desde el Google Sheet ===
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_TGbgo-sVm6R7EMGGVAkrztMQ6RxtqAb-9YYJj5lTBlNMG-SU9lseA9a7bT_d8sWTvo0-fXV4xlUH/pub?gid=642137454&single=true&output=csv";
 
@@ -24,12 +36,18 @@ async function cargarProductos() {
         imagen:    `imagenes/${f[COL.sku].trim()}.jpeg`,
       }))
       .filter(p =>
-        p.rubro.toUpperCase() === RUBRO_TIENDA &&  // solo Strenko
-        p.nombre &&
-        p.stock > 0
-      );
+          p.rubro.toUpperCase() === RUBRO_TIENDA &&
+          p.nombre
+        );
 
-    // ← LA CLAVE: re-inyecta los productos custom y VUELVE a pintar la grilla
+    // 👇 ESTO ES LO QUE FALTA 👇
+    window.productosData.forEach(prod => {
+      if (IMAGENES_MANUALES[prod.sku]) {
+        prod.imagen = IMAGENES_MANUALES[prod.sku];
+      }
+    });
+
+    // ← re-inyecta los productos custom y VUELVE a pintar la grilla
     if (typeof cargarProductosCustom === "function") cargarProductosCustom();
     if (typeof renderGrid === "function") renderGrid();
   } catch (e) {
@@ -60,3 +78,4 @@ function parseCSV(texto) {
 // Inicia vacío para que init() de app.js no falle mientras llega el Sheet
 window.productosData = window.productosData || [];
 cargarProductos();
+

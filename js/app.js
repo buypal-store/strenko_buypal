@@ -14,7 +14,14 @@ const el = (id) => document.getElementById(id);
 function formatPEN(n) {
     return `S/ ${Math.round(Number(n) || 0)}`;
 }
-
+function normalizar(str) {
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')   // quita tildes
+    .replace(/[^a-z0-9]+/g, ' ')        // cambia guiones, puntos, etc. por espacios
+    .trim();
+}
 
 function renderGrid() {
   const grid = el("productGrid");
@@ -511,17 +518,22 @@ function autocompletarCampos(datos) {
 
 // ---------- BÚSQUEDA (por SKU) ----------
 function bindSearch() {
-    const searchInput = el("searchInput");
-    if (!searchInput) return;
-    searchInput.addEventListener("input", function (e) {
-        const term = e.target.value.trim().toLowerCase();
-        const cards = document.querySelectorAll('.card');
-        cards.forEach(card => {
-            const skuDisplay = card.querySelector('.sku-display');
-            const sku = (skuDisplay?.textContent || '').toLowerCase();
-            card.style.display = sku.includes(term) ? '' : 'none';
-        });
+  const searchInput = el("searchInput");
+  if (!searchInput) return;
+
+  searchInput.addEventListener("input", function (e) {
+    const tokens = normalizar(e.target.value).split(' ').filter(Boolean);
+    const cards = document.querySelectorAll('.card');
+
+    cards.forEach(card => {
+      const hay = card.dataset.search || '';
+      const compact = card.dataset.searchCompact || '';
+      const match = tokens.length === 0 || tokens.every(t =>
+        hay.includes(t) || compact.includes(t)
+      );
+      card.style.display = match ? '' : 'none';
     });
+  });
 }
 // ---------- AGREGAR PRODUCTO PERSONALIZADO ----------
 function cargarProductosCustom() {

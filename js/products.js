@@ -1,9 +1,8 @@
-// === Catálogo BuyPal — se alimenta solo desde el Google Sheet ===
+// === Catálogo Strenko — se alimenta solo desde el Google Sheet ===
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_TGbgo-sVm6R7EMGGVAkrztMQ6RxtqAb-9YYJj5lTBlNMG-SU9lseA9a7bT_d8sWTvo0-fXV4xlUH/pub?gid=642137454&single=true&output=csv";
 
 const RUBRO_TIENDA = "STRENKO";   // esta es la tienda de este repo
 
-// Orden real de tu hoja "Datos":
 // A=SKU  B=Nombre  C=Categoria  D=Precio  E=Stock  F=Linea/Rubro
 const COL = { sku: 0, nombre: 1, categoria: 2, precio: 3, stock: 4, rubro: 5 };
 
@@ -11,10 +10,10 @@ async function cargarProductos() {
   try {
     const csv   = await (await fetch(CSV_URL)).text();
     const filas = parseCSV(csv);
-    const datos = filas.slice(1); // salta la fila de encabezados
+    const datos = filas.slice(1);
 
     window.productosData = datos
-      .filter(f => f[COL.sku]?.trim())            // descarta filas sin SKU
+      .filter(f => f[COL.sku]?.trim())
       .map(f => ({
         sku:       f[COL.sku].trim(),
         nombre:    (f[COL.nombre]    || "").trim(),
@@ -25,12 +24,14 @@ async function cargarProductos() {
         imagen:    `imagenes/${f[COL.sku].trim()}.jpeg`,
       }))
       .filter(p =>
-        p.rubro.toUpperCase() === RUBRO_TIENDA &&  // ← solo Strenko
-        p.nombre &&                                 // con nombre
-        p.stock > 0                                 // con stock
+        p.rubro.toUpperCase() === RUBRO_TIENDA &&  // solo Strenko
+        p.nombre &&
+        p.stock > 0
       );
 
-    renderCatalogo();  // ← reemplaza por el nombre real de tu función de render
+    // ← LA CLAVE: re-inyecta los productos custom y VUELVE a pintar la grilla
+    if (typeof cargarProductosCustom === "function") cargarProductosCustom();
+    if (typeof renderGrid === "function") renderGrid();
   } catch (e) {
     console.error("No se pudo cargar el catálogo:", e);
   }
@@ -56,4 +57,6 @@ function parseCSV(texto) {
   return filas;
 }
 
+// Inicia vacío para que init() de app.js no falle mientras llega el Sheet
+window.productosData = window.productosData || [];
 cargarProductos();

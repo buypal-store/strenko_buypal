@@ -10,6 +10,7 @@ const IMAGENES_MANUALES = {
 };
 
 
+
 // === Catálogo Strenko — se alimenta solo desde el Google Sheet ===
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_TGbgo-sVm6R7EMGGVAkrztMQ6RxtqAb-9YYJj5lTBlNMG-SU9lseA9a7bT_d8sWTvo0-fXV4xlUH/pub?gid=642137454&single=true&output=csv";
 
@@ -78,4 +79,3 @@ function parseCSV(texto) {
 // Inicia vacío para que init() de app.js no falle mientras llega el Sheet
 window.productosData = window.productosData || [];
 cargarProductos();
-

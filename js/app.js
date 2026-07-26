@@ -17,67 +17,70 @@ function formatPEN(n) {
 
 // ---------- RENDERIZAR PRODUCTOS ----------
 function renderGrid() {
-    const grid = el("productGrid");
-    if (!grid) return;
-    grid.innerHTML = "";
+  const grid = el("productGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
 
-    const productos = window.productosData || [];
-    productos.forEach((prod, index) => {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `
-      <div class="card-img">
-        <img src="${prod.imagen || 'assets/images/placeholder.jpg'}" alt="${prod.nombre || 'Escalera'}">
+  const productos = window.productosData || [];
+  productos.forEach((prod, index) => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    // Índice de búsqueda precalculado
+    const campos = [prod.sku, prod.nombre, prod.marca, prod.categoria, prod.descripcion];
+    const hay = normalizar(campos.filter(Boolean).join(' '));
+    card.dataset.search = hay;
+    card.dataset.searchCompact = hay.replace(/\s/g, '');
+
+    const sinStock = (Number(prod.stock) || 0) <= 0;
+    if (sinStock) card.classList.add("agotado");
+
+    card.innerHTML = `
+    <div class="card-img">
+      <img src="${prod.imagen || 'assets/images/placeholder.jpg'}" alt="${prod.nombre || 'Producto'}">
+      ${sinStock ? '<span class="badge-agotado">Agotado</span>' : ''}
+    </div>
+    <div class="card-body">
+      <div class="card-name">${prod.nombre || 'Producto'}</div>
+      <div class="card-meta">
+        <span class="sku-display">${prod.sku || ''}</span>
+        <div class="price">${formatPEN(prod.precio)}</div>
       </div>
-      <div class="card-body">
-        <div class="card-name">${prod.nombre || 'Escalera'}</div>
-        <div class="card-meta">
-          <span class="sku-display">${prod.sku || ''}</span>
-          <div class="price">${formatPEN(prod.precio)}</div>
-        </div>
+      <div class="card-stock" style="font-size:11px;font-weight:700;margin-top:4px;color:${sinStock ? '#ef4444' : (prod.stock > 5 ? '#22c55e' : '#f59e0b')};">
+        ${sinStock ? '🚫 Agotado' : '📦 Stock: ' + prod.stock}
       </div>
-      <div class="card-actions">
-        <button class="btn small btn-agregar" data-index="${index}">Agregar</button>
-      </div>
-    `;
-        grid.appendChild(card);
+    </div>
+    <div class="card-actions">
+      <button class="btn small btn-agregar" data-index="${index}" ${sinStock ? 'disabled' : ''}
+        style="${sinStock ? 'opacity:.5;cursor:not-allowed;' : ''}">
+        ${sinStock ? 'Sin stock' : 'Agregar'}
+      </button>
+    </div>
+  `;
+    grid.appendChild(card);
+  });
+
+  // Eventos de los botones "Agregar" (solo los habilitados)
+  document.querySelectorAll('.btn-agregar').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      if (this.disabled) return;                    // seguridad extra
+      const index = parseInt(this.dataset.index);
+      const prod = productos[index];
+
+      state.cart.push({
+        cartId: ++state.cartSeq,
+        sku: prod.sku,
+        nombre: prod.nombre || 'Producto',
+        precio: Number(prod.precio) || 0,
+        originalPrice: Number(prod.precio) || 0,
+        type: 'producto'
+      });
+
+      actualizarContador();
+      this.textContent = '✓ Agregado';
+      setTimeout(() => { this.textContent = 'Agregar'; }, 600);
     });
-
-    // Eventos de los botones "Agregar"
-    document.querySelectorAll('.btn-agregar').forEach(btn => {
-        btn.addEventListener('click', function (e) {
-            const index = parseInt(this.dataset.index);
-            const prod = productos[index];
-            const sku = prod.sku; // siempre el SKU original del producto
-
-            state.cart.push({
-                cartId: ++state.cartSeq,
-                sku: prod.sku,
-                nombre: prod.nombre || 'Bicicleta',
-                precio: Number(prod.precio) || 0,
-                originalPrecio: Number(prod.precio) || 0,
-                isGift: false,
-                type: 'spinning'
-            });
-
-            // Solo las bicicletas de spinning reciben la balanza de regalo
-            const skusConRegalo = ['SPINNING-BICYCLE', 'SPINNING-BIKE-DH68', 'xd'];
-            if (skusConRegalo.includes(prod.sku)) {
-                state.cart.push({
-                    cartId: ++state.cartSeq,
-                    sku: 'BALANZA-BLUETOOTH',
-                    nombre: 'Balanza Bluetooth - Regalo',
-                    precio: 0,
-                    originalPrecio: 0,
-                    type: 'regalo'
-                });
-            }
-
-            actualizarContador();
-            this.textContent = '✓ Agregado';
-            setTimeout(() => { this.textContent = 'Agregar'; }, 600);
-        });
-    });
+  });
 }
 
 // ---------- CONTADOR DEL CARRITO ----------

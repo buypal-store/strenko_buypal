@@ -84,6 +84,18 @@ function renderGrid() {
         originalPrice: Number(prod.precio) || 0,
         type: 'producto'
       });
+            
+      const balanza = (window.productosData || []).find(p => p.sku === "BALANZA-BLUETOOTH");
+      if (balanza && Number(balanza.stock) > 0) {
+        state.cart.push({
+          cartId: ++state.cartSeq,
+          sku: balanza.sku,
+          nombre: balanza.nombre || "Balanza Bluetooth (Regalo)",
+          precio: 0,
+          originalPrice: 0,
+          type: 'regalo'
+        });
+      }
 
       actualizarContador();
       this.textContent = '✓ Agregado';

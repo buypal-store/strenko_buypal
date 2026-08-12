@@ -1,7 +1,5 @@
 // Imágenes personalizadas por SKU (sobrescriben la automática "imagenes/SKU.jpeg")
 const IMAGENES_MANUALES = {
-  "SPINNING-BIKE":                     "imagenes/Spinning 4 kg.jpeg",
-  "SPINNING-BIKE-DH68":                "imagenes/Spinning bike DH68 8 kg.jpeg",
   "MINI-BANDS":                        "imagenes/bandas elasticas.jpg",
   "ESCALADORA-VERTICAL":               "imagenes/escaladora.jpg",
   "BALANZA-BLUETOOTH":                  "imagenes/balanza-blutu.jpg",

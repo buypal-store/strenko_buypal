@@ -1,9 +1,8 @@
 // Imágenes personalizadas por SKU (sobrescriben la automática "imagenes/SKU.jpeg")
 const IMAGENES_MANUALES = {
-  "MINI-BANDS":                        "imagenes/bandas elasticas.jpg",
   "ESCALADORA-VERTICAL":               "imagenes/escaladora.jpg",
-  "BALANZA-BLUETOOTH":                  "imagenes/balanza-blutu.jpg",
-  "MAQUINA-ABDOMINALES-22366":               "imagenes/Abdominales.jpeg",
+  "BALANZA-BLUETOOTH":                 "imagenes/balanza-blutu.jpg",
+  "MAQUINA-ABDOMINALES-22366":         "imagenes/Abdominales.jpeg",
   
 };
 

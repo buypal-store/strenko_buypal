@@ -94,8 +94,10 @@ function renderGrid() {
         type: 'producto'
       });
             
+      // Regalo solo cuando el producto agregado NO es la propia balanza
       const balanza = (window.productosData || []).find(p => p.sku === "BALANZA-BLUETOOTH");
-      if (balanza && Number(balanza.stock) > 0) {
+      const esLaBalanza = prod.sku === "BALANZA-BLUETOOTH";
+      if (!esLaBalanza && balanza && Number(balanza.stock) > 0) {
         state.cart.push({
           cartId: ++state.cartSeq,
           sku: balanza.sku,

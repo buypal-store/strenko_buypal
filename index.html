@@ -60,7 +60,10 @@
             <div class="modal-card summary-card" style="max-width:700px !important;">
                 <button id="pedidoClose" class="modal-close">✕</button>
                 <div class="summary-body">
-                    <div class="summary-title">🧾 Resumen de Pedido</div>
+                    <div class="summary-title">🧾 Resumen de Pedido
+                      <button id="btnCopiarTexto" title="Copiar resumen en texto para WhatsApp"
+                        style="float:right; margin-right:44px; background:#22c55e; color:#fff; border:none; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:16px; line-height:1; padding:0;">💬</button>
+                    </div>
 
                     <!-- Tabla SKU + Producto + Precio -->
                     <div style="overflow-x:auto; margin-bottom:12px;">
@@ -125,6 +128,7 @@
                                 <option value="">-</option>
                                 <option value="Boleta">Boleta</option>
                                 <option value="Factura">Factura</option>
+                                <option value="No boletear">No boletear</option>
                             </select>
                             <label style="margin-top:6px;">Observación</label>
                             <input id="campoObservacion" class="campo-pedido" placeholder="-" autocomplete="off">

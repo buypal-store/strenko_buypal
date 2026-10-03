@@ -548,6 +548,8 @@ function renderTablaPedidoFinal() {
 
 // ---------- ENVIAR PEDIDO A n8n (sin cambios) ----------
 function enviarPedido() {
+  // Shalom: avisa si la agencia no salió de la lista (la guía necesita la dirección oficial)
+  if (window.ShalomAgencias && !window.ShalomAgencias.confirmarEnvio()) return;
   const subtotal = subtotalCarrito();
   const totalFinal = state.finalTotal || subtotal;
 
@@ -673,6 +675,8 @@ function autocompletarCampos(datos) {
       }
     }
   });
+  // Pedido Shalom: abre el buscador de agencias con lo que escribió el cliente
+  if (window.ShalomAgencias) window.ShalomAgencias.revisar();
 }
 
 // ---------- BÚSQUEDA (por SKU) ----------

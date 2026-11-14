@@ -94,10 +94,12 @@ function renderGrid() {
         type: 'producto'
       });
             
-      // Regalo solo cuando el producto agregado NO es la propia balanza
+      // Balanza de regalo solo con las máquinas (las pestañas Cardio y Tonificadoras del catálogo). Los accesorios
+      // (rodillera, mancuernas, bandas, la propia balanza) no dan regalo (Luis, 14/11/2026)
       const balanza = (window.productosData || []).find(p => p.sku === "BALANZA-BLUETOOTH");
-      const esLaBalanza = prod.sku === "BALANZA-BLUETOOTH";
-      if (!esLaBalanza && balanza && Number(balanza.stock) > 0) {
+      const esMaquina = /trotadora|caminadora|spinning|bicicleta|escaladora|coaster|crunch|abdominal|abdomen|gl[uú]teo/i.test(prod.nombre || "")
+        || prod.sku === "MAQUINA-ABDOMINALES-CURVO";
+      if (esMaquina && balanza && Number(balanza.stock) > 0) {
         state.cart.push({
           cartId: ++state.cartSeq,
           sku: balanza.sku,

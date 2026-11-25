@@ -757,7 +757,9 @@ async function enviarPedidoRevisado() {
     adelanto: el("campoAdelanto")?.value || "",
     conversation_id: new URLSearchParams(window.location.search).get('conversation_id') || "",
     sesion: window.SesionERP ? SesionERP.token() : "",   // 31/10/2026: usuario del ERP (js/sesion.js)
-    fecha: document.getElementById('campoFecha')?.value || ""
+    fecha: document.getElementById('campoFecha')?.value || "",
+    // 25/11/2026: si el pedido se cargó con "Cargar pedido de Volko" (js/borrador.js), va la marca del borrador
+    desde_borrador: window.BorradorPeldano ? window.BorradorPeldano.cargado() : ""
   };
 
 
